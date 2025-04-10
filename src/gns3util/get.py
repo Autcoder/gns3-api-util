@@ -155,65 +155,46 @@ def usernames_and_ids(ctx):
         print("-" * 10)
 
 
-def fuzzy_user_info(ctx, show_groups=bool):
-    users_raw = get_client(ctx).users()
-    if not users_raw[0]:
-        sys.exit("An error occurred getting all the data for the users")
-    users_data = users_raw[1]
-    users = []
-    for user in users_data:
-        users.append(user['username'])
-    selected = fzf_select(users)
-    for user in users_data:
-        if user['username'] in selected:
+def fuzzy_info(ctx, entity, show_members=False):
+    client = get_client(ctx)
+    if entity == "user":
+        success, data = client.users()
+        if not success:
+            sys.exit("An error occurred getting all the data for users")
+        items = data
+        identifier_key = 'username'
+        member_func = lambda item: client.users_groups(item['user_id'])
+        member_error = "An error occurred getting groups for the user"
+        no_members_error = "this user is in no groups"
+    elif entity == "group":
+        success, data = client.groups()
+        if not success:
+            sys.exit("An error occurred getting all the data for groups")
+        items = data
+        identifier_key = 'name'
+        member_func = lambda item: client.group_members(item['user_group_id'])
+        member_error = "An error occurred getting members for the group"
+        no_members_error = "this group has no members"
+    else:
+        sys.exit("Unsupported entity type")
+    
+    names = [item[identifier_key] for item in items]
+    selected = fzf_select(names)
+    for item in items:
+        if item[identifier_key] in selected:
             print(f"{GREY}---{RESET}")
-            for key, value in user.items():
+            for key, value in item.items():
                 print(f"{CYAN}{key}{RESET}: {value}")
             print(f"{GREY}---{RESET}")
-            if show_groups:
-                groups_raw = get_client(ctx).users_groups(user['user_id'])
-                if not groups_raw[0]:
-                    sys.exit(
-                        "An error occurred getting all the data for the groups members")
-                groups = groups_raw[1]
-                if groups == []:
-                    sys.exit("this user is in no groups")
-                for group in groups:
+            if show_members:
+                s, members = member_func(item)
+                if not s:
+                    sys.exit(member_error)
+                if not members:
+                    sys.exit(no_members_error)
+                for member in members:
                     print(f"{GREY}---{RESET}")
-                    for key, value in group.items():
-                        print(f"{CYAN}{key}{RESET}: {value}")
-                    print(f"{GREY}---{RESET}")
-
-
-def fuzzy_group_info(ctx, show_members=bool):
-    groups_raw = get_client(ctx).groups()
-    if not groups_raw[0]:
-        sys.exit("An error occurred getting all the data for the groups")
-    groups_data = groups_raw[1]
-    groups = []
-    for group in groups_data:
-        groups.append(group['name'])
-    selected = fzf_select(groups)
-    for group in groups_data:
-        if group['name'] in selected:
-            print(f"{GREY}---{RESET}")
-            for key, value in group.items():
-                print(f"{CYAN}{key}{RESET}: {value}")
-            print(f"{GREY}---{RESET}")
-    if show_members:
-        for group in groups_data:
-            if group['name'] in selected:
-                group_members_raw = get_client(
-                    ctx).group_members(group['user_group_id'])
-                if not group_members_raw[0]:
-                    sys.exit(
-                        "An error occurred getting all the data for the groups members")
-                group_members = group_members_raw[1]
-                if group_members == []:
-                    sys.exit("this group has no members")
-                for group_member in group_members:
-                    print(f"{GREY}---{RESET}")
-                    for key, value in group_member.items():
+                    for key, value in member.items():
                         print(f"{CYAN}{key}{RESET}: {value}")
                     print(f"{GREY}---{RESET}")
 
@@ -221,46 +202,46 @@ def fuzzy_group_info(ctx, show_members=bool):
 @get.command(name="find-user-info", help="find user info using fzf")
 @click.pass_context
 def find_user_info(ctx):
-    fuzzy_user_info(ctx)
+    fuzzy_info(ctx, "user")
 
 
 @get.command(name="fui", help="find user info using fzf")
 @click.pass_context
 def find_user_info_command_short(ctx):
-    fuzzy_user_info(ctx)
+    fuzzy_info(ctx, "user")
 
 
 @get.command(name="find-group-info", help="find group info using fzf")
 @click.pass_context
 def find_group_info(ctx):
-    fuzzy_group_info(ctx)
+    fuzzy_info(ctx, "group")
 
 
 @get.command(name="fgi", help="find group info using fzf")
 @click.pass_context
 def find_group_info_command_short(ctx):
-    fuzzy_group_info(ctx)
+    fuzzy_info(ctx, "group")
 
 
 @get.command(name="find-group-info-with-usernames", help="find group info with members using fzf")
 @click.pass_context
 def find_group_info_with_members(ctx):
-    fuzzy_group_info(ctx, True)
+    fuzzy_info(ctx, "group", True)
 
 
 @get.command(name="fgim", help="find group info with members using fzf")
 @click.pass_context
 def find_group_info_with_members_command_short(ctx):
-    fuzzy_group_info(ctx, True)
+    fuzzy_info(ctx, "group", True)
 
 
 @get.command(name="find-user-info-and-group-membership", help="find user info and group membership using fzf")
 @click.pass_context
 def find_user_info_and_groups(ctx):
-    fuzzy_user_info(ctx)
+    fuzzy_info(ctx, "user", True)
 
 
 @get.command(name="fuig", help="find user info and group membership using fzf")
 @click.pass_context
 def find_user_info_and_groups_short(ctx):
-    fuzzy_user_info(ctx)
+    fuzzy_info(ctx, "user", True)
