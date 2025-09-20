@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -59,6 +60,7 @@ This command will:
 	createExerciseCmd.Flags().String("template", "", "Existing project name/ID or path to template file (.gns3project) to use as base for all exercise projects")
 	createExerciseCmd.Flags().Bool("select-template", false, "Interactively select a template project from existing projects on the server (recommended)")
 	createExerciseCmd.Flags().Bool("confirm", true, "Confirm before creating projects")
+	createExerciseCmd.Flags().Bool("delete-template-project", false, "Delete the template when using a project as a template")
 
 	_ = createExerciseCmd.MarkFlagRequired("class")
 	_ = createExerciseCmd.MarkFlagRequired("exercise")
@@ -78,6 +80,7 @@ func runCreateExercise(cmd *cobra.Command, args []string) error {
 	templatePath, _ := cmd.Flags().GetString("template")
 	selectTemplate, _ := cmd.Flags().GetBool("select-template")
 	confirm, _ := cmd.Flags().GetBool("confirm")
+	deleteTemplate, _ := cmd.Flags().GetBool("delete-template-project")
 
 	groupsBody, status, err := utils.CallClient(cfg, "getGroups", []string{}, nil)
 	if err != nil {
@@ -165,12 +168,7 @@ func runCreateExercise(cmd *cobra.Command, args []string) error {
 		groupID := group.UserGroupID.String()
 
 		hasExercise := false
-		for _, existingGroup := range existingExercises {
-			if existingGroup == groupName {
-				hasExercise = true
-				break
-			}
-		}
+		hasExercise = slices.Contains(existingExercises, groupName)
 		if hasExercise {
 			continue
 		}
@@ -194,7 +192,7 @@ func runCreateExercise(cmd *cobra.Command, args []string) error {
 			colorUtils.Highlight(groupName))
 	}
 
-	if templateProjectID != "" {
+	if templateProjectID != "" && deleteTemplate {
 		if err := cleanupTemplateProject(cfg, templateProjectID); err != nil {
 			fmt.Printf("%v Warning: Failed to clean up template project: %v\n",
 				colorUtils.Warning("Warning:"),
